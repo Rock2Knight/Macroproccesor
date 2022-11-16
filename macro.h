@@ -6,7 +6,7 @@
 extern int sizeOfString;                  // Длина строки
 
 extern char* DEFTAB[];      // Таблица макроопределений
-extern char* ARGTAB;                 // Таблица аргументов
+extern char** ARGTAB;                 // Таблица аргументов
 extern Namtab namtab[];       // Таблица, хранящая имена фактических макропараметров
 
 void assemble(str*);

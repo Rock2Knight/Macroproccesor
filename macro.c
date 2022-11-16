@@ -14,7 +14,7 @@ int k1, k2, k3, k4, k5;                // Индексы для метки, ко
 char Metka, Command, Args, Comment;    // Флаги для метки, команды, аргументов и комментария
 
 char* DEFTAB[COUNT_OF_STRINGS];      // Таблица макроопределений
-char* ARGTAB = NULL;                 // Таблица аргументов
+char** ARGTAB = NULL;                 // Таблица аргументов
 Namtab namtab[COUNT_OF_MACRO];       // Таблица, хранящая имена фактических макропараметров
 
 // Функция разбора строки программы на ассемблере на составляющие
@@ -88,7 +88,10 @@ void clearNamtab(Namtab* NAMTAB, int size){
 void writeToDeftab(char* buf_str, int macro_ind){
 	int isParametr = 0;
 	int j = 0;
-	int arg_count;
+	int j_macro = 0;
+	int arg_count = 0;
+	int arg_index = 0;
+	int isWrite = 0;
 
     while(buf_str[j]!='\0' || buf_str[j]!='\000'){
         if(buf_str[j]==';')
@@ -97,37 +100,77 @@ void writeToDeftab(char* buf_str, int macro_ind){
         if(buf_str[j] == '&')
             isParametr = 1;
         else if(isParametr == 1 && isalpha(buf_str[j])){  // Если мы нашли формальный параметр, ищем его ндекс в ARGTAB
-            arg_count = 0;
-            while(ARGTAB[arg_count] != '\0' || ARGTAB[arg_count] != '\000'){
-                if(ARGTAB[arg_count] == buf_str[j]){
-                    DEFTAB[macro_ind][j] = (char)(arg_count) + '0';
-                    break;
-                }
-                arg_count += 1;
-            }
+            
+			int isParam = 0;
+			for(arg_count=0; arg_count<10; arg_count++){
+				if(ARGTAB[arg_count]==NULL)
+					break;
+				arg_index = 0;
+				while(ARGTAB[arg_count][arg_index] != '\0' || ARGTAB[arg_count][arg_index] != '\000'){
+                	if(ARGTAB[arg_count][arg_index] != buf_str[j+arg_index]){
+						isParam = 1;
+						break;
+					}
+					arg_index += 1;
+				}
+
+				if(isParam == 0){
+					DEFTAB[macro_ind][j_macro] = (char)(arg_count) + '0';
+					j += arg_index;
+					isWrite = 1;
+					break;
+				}
+				else
+					isParam = 0;
+			}
 
             isParametr = 0;
-            j += 1;
+			j_macro += 1;
+			if(isWrite == 0)
+            	j += 1;
+			else
+				isWrite = 0;
             continue;
         }
-        DEFTAB[macro_ind][j] = buf_str[j];
+        DEFTAB[macro_ind][j_macro] = buf_str[j];
         j += 1;
+		j_macro+=1;
     }
 }
 
 void macroExpand(Namtab note, char* args){
 	int arg_count = 0;
+	int arg_index = 0;
 	int i_arg = 0;
 	int isParametr = 0;
 
+	if(ARGTAB[arg_count] != NULL){
+		free(ARGTAB[arg_count]);
+		ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
+	}
+
 	// Запись фактических параметров в ARGTAB
     while(args[i_arg]!='\0' || args[i_arg]!='\000'){
-        if(isalpha(args[i_arg])){
-        	ARGTAB[arg_count] = args[i_arg];
+
+		//В случае обнаружения разделителя, переходим к следующему элементу в ARGTAB
+        if(args[i_arg] == ','){
             arg_count += 1;
+			free(ARGTAB[arg_count]);
+            ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
+        	arg_index = 0;
+            i_arg += 1;
+            continue;
         }
+  
+        if(isalpha(args[i_arg])){
+            ARGTAB[arg_count][arg_index] = args[i_arg];
+            arg_index += 1;
+        }
+            
         i_arg += 1;
 	}
+
+	arg_count += 1;
 
 	for(int i=note.begin+1; i<note.end; i++){
 		int j=0;
@@ -143,7 +186,7 @@ void macroExpand(Namtab note, char* args){
 						break;
 					}
 				}
-				printf("%c", ARGTAB[index]);
+				printf("%s", ARGTAB[index]);
 				isParametr=0;
 			}
 			else

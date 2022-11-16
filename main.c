@@ -12,7 +12,7 @@
 const char* beginCX = "1000h";      // Начальное значение счетчика размещений
 
 extern char* DEFTAB[];        // Таблица макроопределений
-extern char* ARGTAB;          // Таблица аргументов
+extern char** ARGTAB;          // Таблица аргументов
 extern Namtab namtab[];       // Таблица, хранящая имена фактических макропараметров
 
 // Нужно допилить замену формальных параметров на их коды в ARGTAB
@@ -28,9 +28,15 @@ int main(){
     char isParametr = 0;                 // Флаг для обнаружения параметра
     char* macroBuffer[10];               // Строки макроопределений для коррекции
 
-    FILE* source = fopen("asm_example1.asm", "r");
+    ARGTAB = (char**)malloc(sizeof(char*)*10);        // Выделяем память под ARGTAB
 
+    //Инициализация ARGTAB
+    for(int i=0; i<10; i++)
+        ARGTAB[i] = NULL;
 
+    FILE* source = fopen("asm_example2.asm", "r");
+
+    // Основной цикл
     while(!feof(source)){
         fgets(buffer[ind].len, sizeof(buffer[ind].len), source);
 
@@ -98,7 +104,7 @@ int main(){
             printf("%s", buffer[ind].len);
             isMacro = -1;
         }
-        else{
+        else{             
             // Проделываем действия по запоминанию тела макроопределения
             if(isMacro==0){
                 //Запись в таблицу макроимен
@@ -110,14 +116,25 @@ int main(){
         
                 // (1) Подстановка в ARGTAB формальных параметров макроса
                 int i_arg = 0;
-                ARGTAB = (char*)malloc(sizeof(char)*50);
                 arg_count = 0;
+                ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
+                int arg_index = 0;
                 while(buffer[ind].args[i_arg]!='\0' || buffer[ind].args[i_arg]!='\000'){
+
+                    //В случае обнаружения разделителя, переходим к следующему элементу в ARGTAB
+                    if(buffer[ind].args[i_arg] == ','){
+                        arg_count += 1;
+                        ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
+                        arg_index = 0;
+                        i_arg += 1;
+                        continue;
+                    }
   
                     if(isalpha(buffer[ind].args[i_arg])){
-                        ARGTAB[arg_count] = buffer[ind].args[i_arg];
-                        arg_count += 1;
+                        ARGTAB[arg_count][arg_index] = buffer[ind].args[i_arg];
+                        arg_index += 1;
                     }
+            
                     i_arg += 1;
                 }
                 // Окончание (1)
@@ -139,8 +156,15 @@ int main(){
     }
 
     clearNamtab(namtab, COUNT_OF_MACRO);
-    free(ARGTAB);
-    ARGTAB = NULL;
 
-    printf("\nHello, World!\n");
+    for(int i=0; i<10; i++){
+        if(ARGTAB[i]!=NULL)
+            free(ARGTAB[i]);
+    }
+    if(ARGTAB != NULL){
+        free(ARGTAB);
+        ARGTAB = NULL;
+    }
+
+    return 0;
 }
