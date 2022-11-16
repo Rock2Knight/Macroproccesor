@@ -10,10 +10,12 @@
 #include "macro.h"
 
 const char* beginCX = "1000h";      // Начальное значение счетчика размещений
+extern int countOfArgs; 
 
 extern char* DEFTAB[];        // Таблица макроопределений
 extern char** ARGTAB;          // Таблица аргументов
 extern Namtab namtab[];       // Таблица, хранящая имена фактических макропараметров
+extern PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
 
 // Нужно допилить замену формальных параметров на их коды в ARGTAB
 
@@ -34,7 +36,13 @@ int main(){
     for(int i=0; i<10; i++)
         ARGTAB[i] = NULL;
 
-    FILE* source = fopen("asm_example2.asm", "r");
+    //Инициализация periodArgs
+    for(int i=0; i<COUNT_OF_MACRO; i++){
+        periodArgs[i].name = NULL;
+        periodArgs[i].value = -1;
+    }
+
+    FILE* source = fopen("asm_ifmacro1.asm", "r");
 
     // Основной цикл
     while(!feof(source)){
@@ -146,7 +154,7 @@ int main(){
 
             // Запись тела макроопределения в DEFTAB
             DEFTAB[macro_ind] = (char*)malloc(sizeof(char)*100);
-            writeToDeftab(buffer[ind].len, macro_ind);
+            writeToDeftab(buffer[ind].len, buffer[ind].command, buffer[ind].args, buffer[ind].metka, macro_ind);
             macro_ind += 1;    // Переход к следующей строке в DEFTAB
         }
 

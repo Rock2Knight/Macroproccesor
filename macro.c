@@ -11,11 +11,13 @@
 
 int sizeOfString = 0;                  // Длина строки
 int k1, k2, k3, k4, k5;                // Индексы для метки, команды, аргументов и комментария
+int countOfArgs = 0;
 char Metka, Command, Args, Comment;    // Флаги для метки, команды, аргументов и комментария
 
-char* DEFTAB[COUNT_OF_STRINGS];      // Таблица макроопределений
-char** ARGTAB = NULL;                 // Таблица аргументов
-Namtab namtab[COUNT_OF_MACRO];       // Таблица, хранящая имена фактических макропараметров
+char* DEFTAB[COUNT_OF_STRINGS];        // Таблица макроопределений
+char** ARGTAB = NULL;                  // Таблица аргументов
+Namtab namtab[COUNT_OF_MACRO];         // Таблица, хранящая имена фактических макропараметров
+PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
 
 // Функция разбора строки программы на ассемблере на составляющие
 void assemble(str* buffer)
@@ -39,18 +41,18 @@ void assemble(str* buffer)
 		if(buffer->len[j]=='\0' || buffer->len[j]=='\000')
 			break;
 
-        if(j == 0 && isalpha(buffer->len[j])){
+        if(j == 0 && (isalpha(buffer->len[j]) || buffer->len[j] == '&')){
 			Metka = 1;
 		}
 		if(Metka==1 && buffer->len[j]==':')
 			Metka = 0;
-		if(j == 6 && isalpha(buffer->len[j])){
+		if(j == 8 && (isalpha(buffer->len[j]) || buffer->len[j]==)){
 			Metka = 0;
 			Command = 1;
 		}
 		if(Command==1 && buffer->len[j]==' ')
 			Command = 0;
-		if(j == 12 && (isalpha(buffer->len[j]) || isdigit(buffer->len[j]) || buffer->len[j] == '&')){
+		if(j == 15 && (isalpha(buffer->len[j]) || isdigit(buffer->len[j]) || buffer->len[j] == '&')){
 			Command = 0;
 			Args = 1;
 		}
@@ -85,7 +87,7 @@ void clearNamtab(Namtab* NAMTAB, int size){
 }
 
 // Запись строки макроопределения в DEFTAB
-void writeToDeftab(char* buf_str, int macro_ind){
+void writeToDeftab(char* buf_str, char* command, char* arg, char* metka, int macro_ind){
 	int isParametr = 0;
 	int j = 0;
 	int j_macro = 0;
@@ -97,7 +99,23 @@ void writeToDeftab(char* buf_str, int macro_ind){
         if(buf_str[j]==';')
             break;
 
-        if(buf_str[j] == '&')
+		// Действия в случае если мы наткнулись на условную переменную
+		if(buf_str[j] == '&' && j==0){
+			periodArgs[countOfArgs].name = (char*)malloc(sizeof(char)*50);
+			int lenOfMetka = strlen(metka);
+			strncpy(periodArgs[countOfArgs].name, metka+1, lenOfMetka);
+			int tt = 0;
+			if(arg[0]=='1')
+				periodArgs[countOfArgs].value = 1;
+			else if(arg[0]=='0')
+				periodArgs[countOfArgs].value = 0;
+
+			countOfArgs += 1;
+			j += 1;
+			continue;
+		}
+		
+        if(buf_str[j] == '&' && j!=0)
             isParametr = 1;
         else if(isParametr == 1 && isalpha(buf_str[j])){  // Если мы нашли формальный параметр, ищем его ндекс в ARGTAB
             

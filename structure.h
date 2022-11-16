@@ -22,4 +22,9 @@ typedef struct Namtab{
     int end;
 }Namtab;
 
+typedef struct PeriodArg{
+	char* name;
+	int value;
+}PeriodArg;
+
 #endif
