@@ -12,12 +12,10 @@
 const char* beginCX = "1000h";      // Начальное значение счетчика размещений
 extern int countOfArgs; 
 
-extern char* DEFTAB[];        // Таблица макроопределений
-extern char** ARGTAB;          // Таблица аргументов
-extern Namtab namtab[];       // Таблица, хранящая имена фактических макропараметров
-extern PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
-
-// Нужно допилить замену формальных параметров на их коды в ARGTAB
+extern def DEFTAB[];           
+extern char** ARGTAB;          
+extern Namtab namtab[];        
+extern PeriodArg periodArgs[COUNT_OF_MACRO];  
 
 int main(){
     str buffer[100];                     // Строки из файла с ассемблерным кодом
@@ -25,10 +23,10 @@ int main(){
     int macro_count = 0;                 // Счетчик макроопределений
     int macro_ind = 0;                   // номер макроопределения
     int arg_count = 0;                   // Количество формальных параметров
-    int call_count = 0;
+    int buf_ind = 0;                     // Индекс для таблицы коррекции макроопределений
 
     char isParametr = 0;                 // Флаг для обнаружения параметра
-    char* macroBuffer[10];               // Строки макроопределений для коррекции
+    char* macroBuffer[10];               // Таблица макроопределений для коррекции
 
     ARGTAB = (char**)malloc(sizeof(char*)*10);        // Выделяем память под ARGTAB
 
@@ -42,6 +40,8 @@ int main(){
         periodArgs[i].value = -1;
     }
 
+    initDeftab();                        // Обнуление DEFTAB
+
     FILE* source = fopen("asm_ifmacro1.asm", "r");
 
     // Основной цикл
@@ -54,13 +54,13 @@ int main(){
             continue;
         }
 
-        assemble(&buffer[ind]);
+        assemble(&buffer[ind]);          // Разбираем строку на мнемоники
 
-        // Если мы встретили обычную строку, при этом счетчик
-        // макроопредлений на 0, то просто печатаем строку на экран
-        int isMacro = strcmp(buffer[ind].command, "macro");
+        int isMacro = strcmp(buffer[ind].command, "macro");   //
         int isMend = strcmp(buffer[ind].command, "mend");
 
+        // Если мы встретили обычную строку, при этом счетчик
+        // макроопредлений = 0, то просто печатаем строку на экран
         if(macro_count == 0 ^ (macro_count == 0 && isMacro == 0)){
             int is_print = -1;
             int isSame = -1;
@@ -72,47 +72,49 @@ int main(){
 
                     isMacro = strcmp(namtab[i].macroName, buffer[ind].command);
                     if(isMacro == 0){
-                        //int isSame = -1;
 
                         //Проверка, что данная строка макровызова не встречалась ранее
-                        if(macroBuffer[call_count]==NULL){
-                            macroBuffer[call_count] = (char*)malloc(sizeof(char)*50);
-                            strcpy(macroBuffer[call_count], buffer[ind].len);
+                        if(macroBuffer[buf_ind]==NULL){
+                            macroBuffer[buf_ind] = (char*)malloc(sizeof(char)*50);   // Если нет, то 
+                            strcpy(macroBuffer[buf_ind], buffer[ind].len);           // записываем строку в буффер
                         }
-                        else{
+                        else{                                            // Если встречалась, то:
                             int t = 0;
+
+                            // Замена символов окончания строки в начале строки пробелами                                   
                             while(isprint(buffer[ind].len[t])==0){
                                 buffer[ind].len[t] = ' ';
                                 t += 1;
                             }
 
-                            isSame = strcmp(buffer[ind].len, macroBuffer[call_count]);
-                            call_count += 1;
-                            if(t == 0){
-                                macroBuffer[call_count] = (char*)malloc(sizeof(char)*50);
-                                strcpy(macroBuffer[call_count], buffer[ind].len);
+                            isSame = strcmp(buffer[ind].len, macroBuffer[buf_ind]);    // Проверка, что данная строка макровызова не встречалась ранее
+                            buf_ind += 1;                                              // переход на новую строку macroBuffer
+                            if(t == 0){                                                   // Если не было выполнено корректировки
+                                macroBuffer[buf_ind] = (char*)malloc(sizeof(char)*50);   // добавляем строку в macroBuffer 
+                                strcpy(macroBuffer[buf_ind], buffer[ind].len);
                             }
                         }
 
-                        if(isSame == 0)
-                            break;
-                        macroExpand(namtab[i], buffer[ind].args);  //Подставляем тело макроса (макрорасширение)
-                        is_print = 1;
+                        if(isSame == 0)                            // Если является повторением уже встреченной,
+                            break;                                 // Выходим из цикла
+                        macroExpand(namtab[i], buffer[ind].args);  // Подставляем тело макроса (макрорасширение)
+                        is_print = 1;                              // Строка напечатана
                         break;
                     }
                 }
             }
 
             if(isSame == 0){
-                isSame = -1;
-                continue;
+                isSame = -1;     // Переходим к следующей строке файла, если
+                continue;        // строка встречалась ранее
             }
             if(is_print == 1)
-                continue;
-            printf("%s", buffer[ind].len);
+                continue;        // и если строка напечатана
+            printf("%s", buffer[ind].len);                       // Если мы не в теле макроопределеня, просто печатаем строку
             isMacro = -1;
         }
         else{             
+
             // Проделываем действия по запоминанию тела макроопределения
             if(isMacro==0){
                 //Запись в таблицу макроимен
@@ -138,6 +140,7 @@ int main(){
                         continue;
                     }
   
+                    // Подставляем символ из аргумента в строку параметра ARGTAB
                     if(isalpha(buffer[ind].args[i_arg])){
                         ARGTAB[arg_count][arg_index] = buffer[ind].args[i_arg];
                         arg_index += 1;
@@ -147,15 +150,15 @@ int main(){
                 }
                 // Окончание (1)
             }
-            else if(strcmp(buffer[ind].command, "mend")==0){
+            else if(strcmp(buffer[ind].command, "mend")==0){        // Действия, если мы встретили признак окончания макроопределения
                 macro_count -= 1;
                 namtab[macro_count].end = macro_ind;
             }
 
             // Запись тела макроопределения в DEFTAB
-            DEFTAB[macro_ind] = (char*)malloc(sizeof(char)*100);
-            writeToDeftab(buffer[ind].len, buffer[ind].command, buffer[ind].args, buffer[ind].metka, macro_ind);
-            macro_ind += 1;    // Переход к следующей строке в DEFTAB
+            DEFTAB[macro_ind].stroka = (char*)malloc(sizeof(char)*100);
+            writeToDeftab(&buffer[ind], macro_ind);
+            macro_ind += 1;    // Переход к следующей sстроке в DEFTAB
         }
 
         isMacro = -1;
@@ -165,6 +168,7 @@ int main(){
 
     clearNamtab(namtab, COUNT_OF_MACRO);
 
+    // Очистка ARGTAB
     for(int i=0; i<10; i++){
         if(ARGTAB[i]!=NULL)
             free(ARGTAB[i]);

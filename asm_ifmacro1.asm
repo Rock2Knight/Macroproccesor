@@ -12,9 +12,9 @@ rdbuff: macro  &indev,&bufadr,&reclth,&eor,&maxlth
         endif
 
         if     (maxlth eq '')
-        +ldt   #4096            
+        +ldt   4096            
         else
-        +ldt   #&maxlth         
+        +ldt   &maxlth         
         endif
 
 loop:   td     =x'&indev'       

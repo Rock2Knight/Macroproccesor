@@ -5,6 +5,12 @@
 #include "string.h"
 #include "stdlib.h"
 
+//Структура для строки DEFTAB
+typedef struct def{
+	char* stroka;
+	int cond;
+}def;
+
 //Структура для строки ассемблерного кода
 typedef struct str
 {
@@ -22,6 +28,7 @@ typedef struct Namtab{
     int end;
 }Namtab;
 
+//Структура для переменных периода макроинициализации
 typedef struct PeriodArg{
 	char* name;
 	int value;

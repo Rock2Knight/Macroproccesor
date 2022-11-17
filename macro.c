@@ -1,4 +1,4 @@
-// Описание простого макропроцессора
+// Описание макропроцессора c поддержкой условной макрогенерации для машины Бека
 #define COUNT_OF_STRINGS 100
 #define COUNT_OF_MACRO 50
 
@@ -11,13 +11,20 @@
 
 int sizeOfString = 0;                  // Длина строки
 int k1, k2, k3, k4, k5;                // Индексы для метки, команды, аргументов и комментария
-int countOfArgs = 0;
+int ipa = 0;                           // Индекс переменных периода макрогенерации
 char Metka, Command, Args, Comment;    // Флаги для метки, команды, аргументов и комментария
 
-char* DEFTAB[COUNT_OF_STRINGS];        // Таблица макроопределений
+def DEFTAB[COUNT_OF_STRINGS];          // Таблица макроопределений
 char** ARGTAB = NULL;                  // Таблица аргументов
 Namtab namtab[COUNT_OF_MACRO];         // Таблица, хранящая имена фактических макропараметров
 PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
+
+void initDeftab(){
+	for(int i=0; i<COUNT_OF_STRINGS; i++){
+		DEFTAB[i].stroka = NULL;
+		DEFTAB[i].cond = -1;
+	}
+}
 
 // Функция разбора строки программы на ассемблере на составляющие
 void assemble(str* buffer)
@@ -46,7 +53,7 @@ void assemble(str* buffer)
 		}
 		if(Metka==1 && buffer->len[j]==':')
 			Metka = 0;
-		if(j == 8 && (isalpha(buffer->len[j]) || buffer->len[j]==)){
+		if(j == 8 && (isalpha(buffer->len[j]) || buffer->len[j]=='+')){
 			Metka = 0;
 			Command = 1;
 		}
@@ -87,73 +94,107 @@ void clearNamtab(Namtab* NAMTAB, int size){
 }
 
 // Запись строки макроопределения в DEFTAB
-void writeToDeftab(char* buf_str, char* command, char* arg, char* metka, int macro_ind){
-	int isParametr = 0;
-	int j = 0;
-	int j_macro = 0;
-	int arg_count = 0;
-	int arg_index = 0;
-	int isWrite = 0;
+void writeToDeftab(str* buffer, int macro_ind){
+	int isParametr = 0;                           // Флаг макропараметра
+	int j = 0;                                    // Номер символа в строке кода ассемблера
+	int j_macro = 0;                              // Номер символа в строке DEFTAB
+	int arg_count = 0;                            // Номер параметра в ARGTAB
+	int arg_index = 0;                            // Индекс символа в параметре ARGTAB
+	int isWrite = 0;                              // Флаг записи номера параметра в DEFTAB
 
-    while(buf_str[j]!='\0' || buf_str[j]!='\000'){
-        if(buf_str[j]==';')
+	// Проставялем флаги строк условия в DEFTAB
+	if(strcmp(buffer->command, "if") == 0)
+		DEFTAB[macro_ind].cond = 2;
+	else if(strcmp(buffer->command, "else")==0)
+		DEFTAB[macro_ind].cond = 3;
+	else if(strcmp(buffer->command, "endif")==0)
+		DEFTAB[macro_ind].cond = 4;
+
+	// Цикл обхода строки кода ассемблера
+    while(buffer->len[j] != '\0' || buffer->len[j] != '\000'){
+        if(buffer->len[j] == ';')                                 // Если встретили комментарий
             break;
 
 		// Действия в случае если мы наткнулись на условную переменную
-		if(buf_str[j] == '&' && j==0){
-			periodArgs[countOfArgs].name = (char*)malloc(sizeof(char)*50);
-			int lenOfMetka = strlen(metka);
-			strncpy(periodArgs[countOfArgs].name, metka+1, lenOfMetka);
-			int tt = 0;
-			if(arg[0]=='1')
-				periodArgs[countOfArgs].value = 1;
-			else if(arg[0]=='0')
-				periodArgs[countOfArgs].value = 0;
+		if(buffer->len[j] == '&' && j == 0){
+			periodArgs[ipa].name = (char*)malloc(sizeof(char)*50);
+			int lenOfMetka = strlen(buffer->metka);
+			strncpy(periodArgs[ipa].name, buffer->metka+1, lenOfMetka);     // Копируем часть метки, удаляя символ '&'
 
-			countOfArgs += 1;
+			// Утсановка значения условной переменной в зависимости от значения аргумента в коде ассемблера
+			if(buffer->args[0] == '1')                       
+				periodArgs[ipa].value = 1;
+			else if(buffer->args[0] == '0')
+				periodArgs[ipa].value = 0;
+
+			ipa += 1;
 			j += 1;
 			continue;
 		}
 		
-        if(buf_str[j] == '&' && j!=0)
+        if(buffer->len[j] == '&' && j!=0)        // При нахождении символа формального параметра ставим его флаг True
             isParametr = 1;
-        else if(isParametr == 1 && isalpha(buf_str[j])){  // Если мы нашли формальный параметр, ищем его ндекс в ARGTAB
+        else if(isParametr == 1 && isalpha(buffer->len[j])){  // Если мы нашли формальный параметр, ищем его ндекс в ARGTAB
             
-			int isParam = 0;
+			int isNotParam = 0;                              // Флаг соответствия параметра из строки кода ассемблера параметру в ARGTAB
 			for(arg_count=0; arg_count<10; arg_count++){
-				if(ARGTAB[arg_count]==NULL)
+				if(ARGTAB[arg_count]==NULL)                  // Параметра ARGTAB нет !!
 					break;
+
 				arg_index = 0;
-				while(ARGTAB[arg_count][arg_index] != '\0' || ARGTAB[arg_count][arg_index] != '\000'){
-                	if(ARGTAB[arg_count][arg_index] != buf_str[j+arg_index]){
-						isParam = 1;
-						break;
+
+				while(ARGTAB[arg_count][arg_index] != '\0' || ARGTAB[arg_count][arg_index] != '\000'){  // Считываем параметр ARGTAB
+                	if(ARGTAB[arg_count][arg_index] != buffer->len[j+arg_index]){                           // и проверяем его на соответсвие параметру
+						isNotParam = 1;                                                  // в строке ассемблера
+						break;                             
 					}
 					arg_index += 1;
 				}
 
-				if(isParam == 0){
-					DEFTAB[macro_ind][j_macro] = (char)(arg_count) + '0';
+				// Записываем код параметра в DEFTAB
+				if(isNotParam == 0){
+					DEFTAB[macro_ind].stroka[j_macro] = (char)(arg_count) + '0';
 					j += arg_index;
 					isWrite = 1;
 					break;
 				}
 				else
-					isParam = 0;
+					isNotParam = 0;
 			}
 
             isParametr = 0;
 			j_macro += 1;
+
+			// Делаем итерацию, если в строке тела макроопрделения не найден макропараметр
 			if(isWrite == 0)
             	j += 1;
 			else
 				isWrite = 0;
             continue;
         }
-        DEFTAB[macro_ind][j_macro] = buf_str[j];
+
+        DEFTAB[macro_ind].stroka[j_macro] = buffer->len[j];
         j += 1;
 		j_macro+=1;
     }
+
+	// Проставялем флаги условных строк в DEFTAB
+	if(macro_ind != 0){
+		if(DEFTAB[macro_ind-1].cond == 2 || DEFTAB[macro_ind-1].cond == 1){
+			if(strcmp(buffer->command, "else") == 0)
+				DEFTAB[macro_ind].cond = 3;
+			else if(strcmp(buffer->command, "endif") == 0)
+				DEFTAB[macro_ind].cond = 4;
+			else
+				DEFTAB[macro_ind].cond = 1;
+		}
+		else if(DEFTAB[macro_ind-1].cond == 3 || DEFTAB[macro_ind-1].cond == 1){
+			if(strcmp(buffer->command, "endif") == 0)
+				DEFTAB[macro_ind].cond = 4;
+			else
+				DEFTAB[macro_ind].cond = 0;
+		}
+	}
 }
 
 void macroExpand(Namtab note, char* args){
@@ -192,14 +233,14 @@ void macroExpand(Namtab note, char* args){
 
 	for(int i=note.begin+1; i<note.end; i++){
 		int j=0;
-		while(DEFTAB[i][j]!='\0' || DEFTAB[i][j]!='\000'){
-			if(DEFTAB[i][j]=='&')
+		while(DEFTAB[i].stroka[j]!='\0' || DEFTAB[i].stroka[j]!='\000'){
+			if(DEFTAB[i].stroka[j]=='&')
 				isParametr = 1;
-			else if(isParametr==1 && isdigit(DEFTAB[i][j])){
+			else if(isParametr==1 && isdigit(DEFTAB[i].stroka[j])){
 				int index = -1;
 				for(int k=0; k<arg_count; k++){
 					char key = (char)(k)+'0';
-					if(key == DEFTAB[i][j]){
+					if(key == DEFTAB[i].stroka[j]){
 						index = k;
 						break;
 					}
@@ -208,7 +249,7 @@ void macroExpand(Namtab note, char* args){
 				isParametr=0;
 			}
 			else
-				printf("%c", DEFTAB[i][j]);
+				printf("%c", DEFTAB[i].stroka[j]);
 			j+=1;
 		}
 	}
