@@ -7,16 +7,20 @@
 #include "ctype.h"
 
 #include "structure.h"
+#include "objects.h"
+#include "settings.h"
 #include "macro.h"
 
 extern const char** cmp;
 const char* beginCX = "1000h";      // Начальное значение счетчика размещений
 extern int countOfArgs; 
 
-extern def DEFTAB[];           
-extern char** ARGTAB;          
-extern Namtab namtab[];        
-extern PeriodArg periodArgs[COUNT_OF_MACRO];  
+extern def DEFTAB[];                          // Таблица макроопределений
+extern char** ARGTAB;                         // Таблица аргументов
+extern Namtab namtab[];                       // Таблица, хранящая имена фактических макропараметров
+extern PeriodArg periodArgs[];                // Таблица параметров периода макрогенерации
+
+extern void assemble(str*); 
 
 int main(){
     str buffer[100];                     // Строки из файла с ассемблерным кодом

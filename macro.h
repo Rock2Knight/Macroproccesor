@@ -2,6 +2,8 @@
 #define MACRO_H
 
 #include "structure.h"
+#include "objects.h"
+#include "settings.h"
 
 extern const char** cmp;
 
@@ -11,10 +13,11 @@ extern int countOfArgs;                       // Действительное к
 extern def DEFTAB[];                          // Таблица макроопределений
 extern char** ARGTAB;                         // Таблица аргументов
 extern Namtab namtab[];                       // Таблица, хранящая имена фактических макропараметров
-extern PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
+extern PeriodArg periodArgs[];                // Таблица параметров периода макрогенерации
+
+extern void assemble(str*);                   
 
 void initDeftab();                            // Иницализация DEFTAB;
-void assemble(str*);
 void clearNamtab(Namtab*, int);               // Очистка таблицы макроимен
 void writeToDeftab(str*, int);                // Запись строки макроопределения в DEFTAB
 int trueCondition(def);                       // Проверка условия в теле макроопределения

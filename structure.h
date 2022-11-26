@@ -1,3 +1,4 @@
+// Описание структур для работы макропроцессора
 #ifndef STRUCTURE_H
 #define STRUCTURE_H
 
