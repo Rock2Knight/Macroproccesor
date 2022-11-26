@@ -9,6 +9,7 @@
 #include "structure.h"
 #include "macro.h"
 
+extern const char** cmp;
 const char* beginCX = "1000h";      // Начальное значение счетчика размещений
 extern int countOfArgs; 
 

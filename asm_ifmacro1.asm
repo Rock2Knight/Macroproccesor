@@ -11,7 +11,7 @@ rdbuff: macro  &indev,&bufadr,&reclth,&eor,&maxlth
         rmo    a,s
         endif
 
-        if     (maxlth eq '')
+        if     (&maxlth eq '')
         +ldt   4096            
         else
         +ldt   &maxlth         

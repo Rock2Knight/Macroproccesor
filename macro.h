@@ -3,6 +3,8 @@
 
 #include "structure.h"
 
+extern const char** cmp;
+
 extern int sizeOfString;                      // Длина строки
 extern int countOfArgs;                       // Действительное количество параметров периода макрогенерации
 
@@ -15,6 +17,7 @@ void initDeftab();                            // Иницализация DEFTAB
 void assemble(str*);
 void clearNamtab(Namtab*, int);               // Очистка таблицы макроимен
 void writeToDeftab(str*, int);                // Запись строки макроопределения в DEFTAB
+int trueCondition(def);                       // Проверка условия в теле макроопределения
 void macroExpand(Namtab, char*);              // Макрорасширение
 
 #endif

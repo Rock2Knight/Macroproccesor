@@ -11,6 +11,7 @@
 
 int sizeOfString = 0;                  // Длина строки
 int k1, k2, k3, k4, k5;                // Индексы для метки, команды, аргументов и комментария
+const char* cmp[2] = {"eq", "ne"};
 int ipa = 0;                           // Индекс переменных периода макрогенерации
 char Metka, Command, Args, Comment;    // Флаги для метки, команды, аргументов и комментария
 
@@ -19,6 +20,7 @@ char** ARGTAB = NULL;                  // Таблица аргументов
 Namtab namtab[COUNT_OF_MACRO];         // Таблица, хранящая имена фактических макропараметров
 PeriodArg periodArgs[COUNT_OF_MACRO];  // Таблица параметров периода макрогенерации
 
+// Инициализация DEFTAB
 void initDeftab(){
 	for(int i=0; i<COUNT_OF_STRINGS; i++){
 		DEFTAB[i].stroka = NULL;
@@ -127,7 +129,10 @@ void writeToDeftab(str* buffer, int macro_ind){
 			else if(buffer->args[0] == '0')
 				periodArgs[ipa].value = 0;
 
+			DEFTAB[macro_ind].stroka[j_macro] = buffer->len[j];
+			isParametr = 1;
 			ipa += 1;
+			j_macro += 1;
 			j += 1;
 			continue;
 		}
@@ -152,14 +157,48 @@ void writeToDeftab(str* buffer, int macro_ind){
 				}
 
 				// Записываем код параметра в DEFTAB
-				if(isNotParam == 0){
+				if(isNotParam == 0 && (buffer->len[j+arg_index] == ' ' || buffer->len[j+arg_index] == ',' || buffer->len[j+arg_index] == '\n' || buffer->len[j+arg_index] == '\'')){
 					DEFTAB[macro_ind].stroka[j_macro] = (char)(arg_count) + '0';
 					j += arg_index;
 					isWrite = 1;
 					break;
 				}
-				else
+				else if(arg_count != 9)
 					isNotParam = 0;
+				else
+					isNotParam = 2;
+			}
+			
+			// Действия, если параметр не окзался в ARGTAB (ищем соответствие среди параметров периода макрогенерации)
+			if(isNotParam = 2){
+				int indOfPArg = 0;       // Индекс параметра макроопределения
+				int k;               // Индекс строки в параметре макроопределения
+
+				for(indOfPArg=0; indOfPArg<COUNT_OF_MACRO; indOfPArg++){
+					if(periodArgs[indOfPArg].name == NULL)
+						break;
+					k = 0;
+					
+					while(periodArgs[indOfPArg].name[k] != '\0' && periodArgs[indOfPArg].name[k] != '\000'){
+						if(periodArgs[indOfPArg].name[k] != buffer->len[j+k]){
+							isNotParam = 3;                                                  // в строке ассемблера
+							break;
+						}
+						k += 1;
+					}
+
+					// Записываем код параметра в DEFTAB
+					if(isNotParam == 2){
+						DEFTAB[macro_ind].stroka[j_macro] = 'x';
+						j_macro += 1;
+						DEFTAB[macro_ind].stroka[j_macro] = (char)(indOfPArg) + '0';
+						j += k;
+						isWrite = 1;
+						break;
+					}
+					else
+						isNotParam = 2;
+				}
 			}
 
             isParametr = 0;
@@ -197,11 +236,107 @@ void writeToDeftab(str* buffer, int macro_ind){
 	}
 }
 
+// Проверка условия в теле макроопределения
+int trueCondition(def def_str){
+	int i = 0;                         // Номер символа в строке DEFTAB
+	int substr_cond = 0;               // Сигнал, что мы читаем условие
+	int isParametr = 0;    			   // Флаг макропараметра
+	int index = -1;                    // Индекс параметра, проверяемого в условии
+	int keyCmp = -1;                   // номер команды сравнения
+	int twind = 0;                     // Индекс timeWord
+	int paramIf = 0;                   // флаг условия
+	int paramInd = 0;                  // Индекс для param
+
+	int result = -1;                   // Результат работы функции
+
+	char* param = (char*)malloc(sizeof(char)*10);      // Буффер для условия в строке
+	char* timeWord = (char*)malloc(sizeof(char)*10);   // Буффер для команды сравнения
+
+	// Цикл обхода строки DEFTAB
+	while(def_str.stroka[i]!='\0' && def_str.stroka[i]!='\000'){
+		if(def_str.stroka[i] == '(' && def_str.cond == 2)          // Проставляем сигнал условия, если наткнулись на '('
+			substr_cond = 1;
+		else if(def_str.stroka[i] == ')')                    // Обнуляем сигнал условия, если наткнулись на ')'
+			substr_cond = 0;
+		else if(substr_cond == 1 && def_str.stroka[i]=='&')       // Если нашли '&', то проставляем флаг макропараметра = 1
+			isParametr = 1;                                       
+		else if(isParametr==1 && isdigit(def_str.stroka[i])){     // Если наткнулись на номер параметра в ARGTAB
+		
+			for(int k=0; k<10; k++){                       // Ищем нужный параметр из ARGTAB
+				if(ARGTAB[k] == NULL)
+					break;
+
+				char key = (char)(k)+'0';
+				if(key == def_str.stroka[i]){
+					index = k;
+					break;
+				}
+			}
+			isParametr=2;                                       // isParametr = 2, так проверяем условие дальше
+		}
+		else if(isParametr==2 && isalpha(def_str.stroka[i])){    // дальше просто записываем символы команды проверки условия
+			timeWord[twind] = def_str.stroka[i];
+			twind += 1;
+		}
+		else if(isParametr==2 && def_str.stroka[i]==' '){        // Ищем нужную команду сравнения
+			for(int j=0; j<2; j++){
+				if(strcmp(timeWord, cmp[j])==0){
+					keyCmp = j;
+					break;
+				}
+			}
+		}
+		else if(substr_cond==1 && def_str.stroka[i]=='\'' && paramIf==0){
+			paramIf = 1;                                                    // Условие прочитано
+
+			// Результат проверки условия
+			if(keyCmp == 0 && strcmp(ARGTAB[index], param)==0){             // Если строки равны и у нас проверка на равенство
+				result = 1;
+				break;
+			}
+			else if(keyCmp == 1 && strcmp(ARGTAB[index], param)!=0){        // Если строки не равны и у нас проверка на отличие
+				result = 1;
+				break;
+			}
+			else{                             // В любом другом случае ставим false
+				result = 0;
+				break;
+			}
+		}
+		else if(substr_cond==1 && paramIf == 1){
+			if(def_str.stroka[i]=='\''){
+				paramIf = 2;
+				// (1) do something
+			}
+			else if(isprint(def_str.stroka[i])){
+				param[paramInd] = def_str.stroka[i];
+				paramInd += 1;
+			}
+		}
+
+		i += 1;
+	}
+
+	if(param != NULL){
+		free(param);
+		param = NULL;
+	}
+
+	if(timeWord != NULL){
+		free(timeWord);
+		timeWord = NULL;
+	}
+
+	return result;
+}
+
 void macroExpand(Namtab note, char* args){
+	char isCond = -1;                            // Флаг условия
 	int arg_count = 0;
 	int arg_index = 0;
 	int i_arg = 0;
 	int isParametr = 0;
+	int isPrint = 0;                             // Печатать ли строку DEFTAB
 
 	if(ARGTAB[arg_count] != NULL){
 		free(ARGTAB[arg_count]);
@@ -221,7 +356,7 @@ void macroExpand(Namtab note, char* args){
             continue;
         }
   
-        if(isalpha(args[i_arg])){
+        if(isalpha(args[i_arg]) || isdigit(args[i_arg])){
             ARGTAB[arg_count][arg_index] = args[i_arg];
             arg_index += 1;
         }
@@ -231,26 +366,44 @@ void macroExpand(Namtab note, char* args){
 
 	arg_count += 1;
 
+	// Подстановка строк макроопределения в код
 	for(int i=note.begin+1; i<note.end; i++){
-		int j=0;
-		while(DEFTAB[i].stroka[j]!='\0' || DEFTAB[i].stroka[j]!='\000'){
-			if(DEFTAB[i].stroka[j]=='&')
-				isParametr = 1;
-			else if(isParametr==1 && isdigit(DEFTAB[i].stroka[j])){
-				int index = -1;
-				for(int k=0; k<arg_count; k++){
-					char key = (char)(k)+'0';
-					if(key == DEFTAB[i].stroka[j]){
-						index = k;
-						break;
+
+
+		if(DEFTAB[i].cond == 2){                        // Если встретили IF
+			isCond = trueCondition(DEFTAB[i]);   // Проверка условия в теле макроопределния
+			continue;
+		}
+		else if(DEFTAB[i].cond == 3)                    // Если встретили ELSE
+			continue;
+		else if(DEFTAB[i].cond == 4){					// Если встретили ENDIF
+			isCond = -1;
+			continue;
+		}
+		else if(DEFTAB[i].cond == isCond)               // условие строки совпадает с текущим условием, то выводим строку в выходной поток
+			isPrint = 1;
+
+		if(isPrint == 1){
+			int j=0;
+			while(DEFTAB[i].stroka[j]!='\0' || DEFTAB[i].stroka[j]!='\000'){
+				if(DEFTAB[i].stroka[j]=='&')
+					isParametr = 1;
+				else if(isParametr==1 && isdigit(DEFTAB[i].stroka[j])){
+					int index = -1;
+					for(int k=0; k<arg_count; k++){
+						char key = (char)(k)+'0';
+						if(key == DEFTAB[i].stroka[j]){
+							index = k;
+							break;
+						}
 					}
+					printf("%s", ARGTAB[index]);
+					isParametr=0;
 				}
-				printf("%s", ARGTAB[index]);
-				isParametr=0;
+				else
+					printf("%c", DEFTAB[i].stroka[j]);
+				j+=1;
 			}
-			else
-				printf("%c", DEFTAB[i].stroka[j]);
-			j+=1;
 		}
 	}
 
