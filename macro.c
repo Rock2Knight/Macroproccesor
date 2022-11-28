@@ -176,6 +176,8 @@ int trueCondition(def def_str){
 	int twind = 0;                     // Индекс timeWord
 	int paramIf = 0;                   // флаг условия
 	int paramInd = 0;                  // Индекс для param
+	int isPeriod = 0;                  // Периодическая переменная или параметр макроса
+	int val = -1;                      // Значение переменной периода условной макрогенерации
 
 	int result = -1;                   // Результат работы функции
 
@@ -204,6 +206,13 @@ int trueCondition(def def_str){
 			}
 			isParametr=2;                                       // isParametr = 2, так проверяем условие дальше
 		}
+		else if(isParametr==1 && def_str.stroka[i]=='x'){
+			index = (int)(def_str.stroka[i+1]-'0');
+			isPeriod = 1;
+			i += 2;
+			isParametr = 2;
+			continue;
+		}
 		else if(isParametr==2 && isalpha(def_str.stroka[i])){    // дальше просто записываем символы команды проверки условия
 			timeWord[twind] = def_str.stroka[i];
 			twind += 1;
@@ -216,34 +225,52 @@ int trueCondition(def def_str){
 				}
 			}
 		}
-		else if(substr_cond==1 && def_str.stroka[i]=='\'' && paramIf==0){
+		else if(isParametr==2 && def_str.stroka[i]=='\'' && paramIf==0)
 			paramIf = 1;                                                    // Условие прочитано
-
-			// Результат проверки условия
-			if(keyCmp == 0 && strcmp(ARGTAB[index], param)==0){             // Если строки равны и у нас проверка на равенство
-				result = 1;
-				break;
+		else if(substr_cond==0 && paramIf==2){
+			if(isPeriod == 0){
+				// Результат проверки условия
+				if(keyCmp == 0 && strcmp(ARGTAB[index], param)==0){             // Если строки равны и у нас проверка на равенство
+					result = 1;
+					break;
+				}
+				else if(keyCmp == 1 && strcmp(ARGTAB[index], param)!=0){        // Если строки не равны и у нас проверка на отличие
+					result = 1;
+					break;
+				}
+				else{                             // В любом другом случае ставим false
+					result = 0;
+					break;
+				}
 			}
-			else if(keyCmp == 1 && strcmp(ARGTAB[index], param)!=0){        // Если строки не равны и у нас проверка на отличие
-				result = 1;
-				break;
-			}
-			else{                             // В любом другом случае ставим false
-				result = 0;
-				break;
+			else if(isPeriod == 1){
+				if(periodArgs[index].value==val && keyCmp == 0){
+					result = 1;
+					break;
+				}
+				else if(periodArgs[index].value!=val && keyCmp == 1){
+					result = 1;
+					break;
+				}
+				else{
+					result = 0;
+					break;
+				}
 			}
 		}
+		else if(substr_cond==1 && paramIf == 0 && isdigit(def_str.stroka[i]) && isPeriod == 1){
+			val = (int)(def_str.stroka[i]-'0');
+			paramIf = 2;
+		}
 		else if(substr_cond==1 && paramIf == 1){
-			if(def_str.stroka[i]=='\''){
-				paramIf = 2;
-				// (1) do something
-			}
-			else if(isprint(def_str.stroka[i])){
+			if(isprint(def_str.stroka[i]) && def_str.stroka[i]!='\''){
 				param[paramInd] = def_str.stroka[i];
 				paramInd += 1;
 			}
+			else if(def_str.stroka[i]=='\''){
+				paramIf = 2;
+			}
 		}
-
 		i += 1;
 	}
 
@@ -265,19 +292,25 @@ void macroExpand(Namtab note, char* args){
 	int arg_count = 0;
 	int arg_index = 0;
 	int i_arg = 0;
-	int isParametr = 0;
 	int isPrint = 0;                             // Печатать ли строку DEFTAB
+	int isNext = 0;                              // Признак перехода к следующей строке DEFTAB
 
 	if(ARGTAB[arg_count] != NULL){
 		free(ARGTAB[arg_count]);
 		ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
 	}
 
+	// Обнуление переменных периода макрогенерации
+	for(int i=0; i<ipa; i++){
+		if(periodArgs[i].value != -1)
+			periodArgs[i].value = -1;
+	}
+
 	arg_count = writeToArgtab(args);           // Запись фактических параметров в ARGTAB
 
 	// Подстановка строк макроопределения в код
 	for(int i=note.begin+1; i<note.end; i++){
-
+		isNext = 0;
 
 		if(DEFTAB[i].cond == 2){                        // Если встретили IF
 			isCond = trueCondition(DEFTAB[i]);          // Проверка условия в теле макроопределния
@@ -291,9 +324,59 @@ void macroExpand(Namtab note, char* args){
 		}
 		else if(DEFTAB[i].cond == isCond)               // условие строки совпадает с текущим условием, то выводим строку в выходной поток
 			isPrint = 1;
+		else
+			isPrint = 0;
 
-		if(isPrint == 1)
-			printSting(i, arg_count);
+		if(isPrint == 1){
+			if(DEFTAB[i].stroka[0] == '&'){
+				int index = (int)(DEFTAB[i].stroka[2]-'0');
+
+				int k=3, k1=0;
+				int isCom = 0;
+				char* tWord = (char*)malloc(sizeof(char)*10);
+
+				while(DEFTAB[i].stroka[k]!='\0' || DEFTAB[i].stroka[k]!='\0'){
+				
+					if(isalpha(DEFTAB[i].stroka[k])){
+						if(isCom == 0){
+							isCom = 1;
+							tWord[k1] = DEFTAB[i].stroka[k];
+							k1 += 1;
+						}
+						else if(isCom == 1){
+							tWord[k1] = DEFTAB[i].stroka[k];
+							k1 += 1;
+						}
+					}
+					else if(DEFTAB[i].stroka[k] == ' ' && isCom == 1){
+						isCom = 2;
+						tWord[k1] = '\0';
+					}
+					else if(isdigit(DEFTAB[i].stroka[k]) && isCom == 2){
+						if(strcmp(tWord, "set")==0){
+							// Утсановка значения условной переменной в зависимости от значения аргумента в коде ассемблера
+							if(DEFTAB[i].stroka[k] == '1')                       
+								periodArgs[index].value = 1;
+							else if(DEFTAB[i].stroka[k] == '0')
+								periodArgs[index].value = 0;
+							isNext = 1;
+							break;
+						}
+					}
+					k += 1;
+				}
+
+				if(tWord != NULL){
+					free(tWord);
+					tWord = NULL;
+				}
+
+				if(isNext == 1)
+					continue;
+			}
+			else
+				printSting(i, arg_count);
+		}
 	}
 
 	printf("\n");
