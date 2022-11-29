@@ -60,8 +60,10 @@ void writeToDeftab(str* buffer, int macro_ind){
 
 	// Цикл обхода строки кода ассемблера
     while(buffer->len[j] != '\0' || buffer->len[j] != '\000'){
-        if(buffer->len[j] == ';')                                 // Если встретили комментарий
-            break;
+        if(buffer->len[j] == ';'){			// Если встретили комментарий
+			DEFTAB[macro_ind].stroka[j_macro] = '\n';
+			break;
+		}                                 
 
 		// Действия в случае если мы наткнулись на условную переменную
 		if(buffer->len[j] == '&' && j == 0){

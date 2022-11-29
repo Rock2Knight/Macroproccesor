@@ -129,7 +129,7 @@ int writeToArgtab(char* args){
 
 		//В случае обнаружения разделителя, переходим к следующему элементу в ARGTAB
         if(args[i_arg] == ','){
-            arg_count += 1;
+			arg_count += 1;
 			free(ARGTAB[arg_count]);
             ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
         	arg_index = 0;
