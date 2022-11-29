@@ -47,7 +47,7 @@ int main(){
 
     initDeftab();                        // Обнуление DEFTAB
 
-    FILE* source = fopen("asm_ifmacro2.asm", "r");
+    FILE* source = fopen("asm_ifmacro.asm", "r");
 
     // Основной цикл
     while(!feof(source)){

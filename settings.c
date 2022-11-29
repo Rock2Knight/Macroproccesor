@@ -146,5 +146,10 @@ int writeToArgtab(char* args){
 	}
 
 	arg_count += 1;
+	if(ARGTAB[arg_count]!=NULL){
+		free(ARGTAB[arg_count]);
+        ARGTAB[arg_count] = (char*)malloc(sizeof(char)*50);
+		arg_count += 1;
+	}
     return arg_count;
 }
