@@ -270,6 +270,9 @@ int trueCondition(def def_str){
 				paramInd += 1;
 			}
 			else if(def_str.stroka[i]=='\''){
+				if(param != NULL)
+					free(param);
+				param = (char*)malloc(sizeof(char)*10);
 				paramIf = 2;
 			}
 		}
